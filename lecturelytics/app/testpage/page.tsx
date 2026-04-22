@@ -13,8 +13,12 @@ export default function TranscribePage() {
     
     socketRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.text) {
-        setTranscript((prev) => [...prev, data.text]);
+      // Use history from backend (already limited to last 5)
+      if (data.history && Array.isArray(data.history)) {
+        const validTranscripts = data.history
+          .filter((item: any) => item.corrected_full && typeof item.corrected_full === 'string')
+          .map((item: any) => item.corrected_full);
+        setTranscript(validTranscripts);
       }
     };
 
@@ -74,7 +78,7 @@ export default function TranscribePage() {
             )}
             {transcript.map((line, i) => (
               <p key={i} className="text-xl text-slate-800 leading-relaxed border-l-4 border-indigo-100 pl-4">
-                {line.charAt(0).toUpperCase() + line.slice(1)}.
+                {line && typeof line === 'string' ? line.charAt(0).toUpperCase() + line.slice(1) : ''}.
               </p>
             ))}
           </div>
