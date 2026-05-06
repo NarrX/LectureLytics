@@ -16,8 +16,8 @@ export default function TranscribePage() {
       // Use history from backend (already limited to last 5)
       if (data.history && Array.isArray(data.history)) {
         const validTranscripts = data.history
-          .filter((item: any) => item.corrected_full && typeof item.corrected_full === 'string')
-          .map((item: any) => item.corrected_full);
+          .filter((item: any) => item.final && typeof item.final === 'string')
+          .map((item: any) => item.final);
         setTranscript(validTranscripts);
       }
     };

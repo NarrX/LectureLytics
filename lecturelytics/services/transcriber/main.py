@@ -1,94 +1,124 @@
 import torch
 import numpy as np
 import uvicorn
+import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
-# NEW: Using a simple LLM call for context correction
-import openai 
-
+import ollama
 import os
-os.environ["HF_TOKEN"] = "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"
+
+# Set your token
+os.environ["HF_TOKEN"] = "hf_VepKxofNESDKFbua   MylHuKmmbTTviDDdbu"
 
 app = FastAPI()
 
 MODEL_ID = "openai/whisper-base" 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Load Whisper
 model = WhisperForConditionalGeneration.from_pretrained(MODEL_ID).to(device)
 processor = WhisperProcessor.from_pretrained(MODEL_ID)
 
-# Optional: Initialize OpenAI/Groq for the "Correction Layer"
-# client = openai.OpenAI(api_key="YOUR_KEY") 
+LLM_MODEL_TYPE = 'qwen2:1.5b'
 
-def llm_correction(raw_text: str):
-    
-    if not raw_text or len(raw_text) < 5:
+def llm_correction(raw_text: str, context_list: list):
+    """
+    Sends the current raw text + the last 3 corrected sentences to Ollama.
+    """
+    if not raw_text or len(raw_text) < 15:
         return raw_text
 
-    # Example logic if you use an API:
-    # response = client.chat.completions.create(
-    #     model="gpt-4o-mini",
-    #     messages=[{"role": "system", "content": "Fix Indonesian typos and technical terms. Return only the corrected text."},
-    #               {"role": "user", "content": raw_text}]
-    # )
-    # return response.choices[0].message.content
-    
-    return raw_text # Placeholder for now
+    # Join the last 3 sentences into a context string
+    context_str = "\n".join(context_list)
 
-def process_audio(audio_np: np.ndarray):
     try:
-        # UPGRADE 2: Audio Normalization
-        # Simple volume normalization helps Whisper "hear" better
+        system_msg = (
+            "You are an Indonesian academic editor. Fix typos and technical terms "
+            "in this lecture transcript. Keep the tone formal. Use the provided context "
+            "to ensure technical consistency, but return ONLY the corrected version "
+            "of the NEWEST sentence."
+        )
+        
+        user_msg = f"CONTEXT:\n{context_str}\n\nNEW SENTENCE TO FIX:\n{raw_text}"
+
+        response = ollama.chat(
+            model=LLM_MODEL_TYPE,
+            messages=[
+                {'role': 'system', 'content': system_msg},
+                {'role': 'user', 'content': user_msg},
+            ],
+            options={"temperature": 0.3, "num_predict": 150}
+        )
+        return response['message']['content'].strip()
+    except Exception as e:
+        print(f"Ollama Error: {e}")
+        return raw_text
+
+def transcribe_audio(audio_np: np.ndarray):
+    """
+    Handles the pure Whisper transcription logic.
+    """
+    try:
+        # Normalize
         if np.max(np.abs(audio_np)) > 0:
             audio_np = audio_np / np.max(np.abs(audio_np))
 
-        inputs = processor(
-            audio_np, 
-            sampling_rate=16000, 
-            return_tensors="pt",
-            return_attention_mask=True
-        )
-        
+        inputs = processor(audio_np, sampling_rate=16000, return_tensors="pt")
         input_features = inputs.input_features.to(device)
-        attention_mask = inputs.attention_mask.to(device)
 
         with torch.no_grad():
-            # UPGRADE 3: Better Generation Params
             predicted_ids = model.generate(
                 input_features, 
-                attention_mask=attention_mask,
                 language="indonesian",
                 task="transcribe",
-                use_cache=True,
-                # Adding these improves stability:
                 no_repeat_ngram_size=3,
-                num_beams=1 # Increase to 3-5 if speed isn't an issue
+                num_beams=3
             )
         
-        raw_text = processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
-        
-        # Apply the LLM correction layer
-        refined_text = llm_correction(raw_text)
-        
-        return {
-            "raw": raw_text,
-            "refined": refined_text,
-        }
-
+        return processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
     except Exception as e:
-        print(f"Error: {e}")
-        return None
+        print(f"Whisper Error: {e}")
+        return ""
+
+async def background_process(audio_data, history_ref, websocket: WebSocket):
+
+    # 1. Transcription (Whisper)
+
+    raw_text = await asyncio.to_thread(transcribe_audio, audio_data)
+    
+    if not raw_text:
+        return
+
+    # 2. Get Context (Last 3 refined sentences)
+    context = [item["final"] for item in history_ref[-3:]]
+
+    # 3. Correction (Ollama)
+    refined_text = await asyncio.to_thread(llm_correction, raw_text, context)
+
+    # 4. Update History
+    new_entry = {"raw": raw_text, "final": refined_text}
+    history_ref.append(new_entry)
+    
+    # Maintain max 5 for frontend
+    if len(history_ref) > 5:
+        history_ref.pop(0)
+
+    # 5. Push to Client
+    await websocket.send_json({
+        "history": history_ref,
+        "count": len(history_ref)
+    })
+    print(f"Pushing refined: {refined_text}")
 
 @app.websocket("/ws/transcribe")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     sentence_buffer = []
-    
-    # 1. Initialize the rolling history list
-    transcription_history = []
+    transcription_history = [] # Local to this connection
     
     try:
         while True:
+            # receive_bytes blocks ONLY until data arrives
             data = await websocket.receive_bytes()
             chunk = np.frombuffer(data, dtype=np.float32)
             
@@ -98,26 +128,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 sentence_buffer.append(chunk)
             elif len(sentence_buffer) > 0:
                 full_audio = np.concatenate(sentence_buffer)
-                
+                sentence_buffer = [] # Clear immediately so we don't miss next sound
+
                 if len(full_audio) > 8000:
-                    result = process_audio(full_audio)
-                    
-                    if result:
-                        # 2. Add new sentence to history
-                        transcription_history.append(result)
-                        
-                        # 3. Keep only the last 5 items
-                        if len(transcription_history) > 5:
-                            transcription_history = transcription_history[-5:]
-                        
-                        # 4. Send the updated history to the frontend
-                        # Frontend will now receive a list of 5 objects
-                        await websocket.send_json({
-                            "history": transcription_history,
-                            "count": len(transcription_history)
-                        })
+                    # Fire and forget the background task
+                    asyncio.create_task(
+                        background_process(full_audio, transcription_history, websocket)
+                    )
                 
-                sentence_buffer = []
     except WebSocketDisconnect:
         print("Client Disconnected")
 
