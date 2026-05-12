@@ -5,11 +5,16 @@ import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 import ollama
+from ollama import Client
 import os
 
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+
+import os
+os.environ["OLLAMA_HOST"] = "127.0.0.1:11434"
+client = Client(host='http://127.0.0.1:11434')
 
 # Initialize the model (it will download automatically on first run)
 embed_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -32,9 +37,8 @@ COSINE_THRESHOLD = 0.55
 LLM_MODEL_TYPE = 'qwen2:1.5b'
 
 def llm_correction(raw_text: str, context_list: list):
-    """
-    Sends the current raw text + the last 3 corrected sentences to Ollama.
-    """
+    print(f"LLM Correction Input:\nRaw Text: {raw_text}\nContext: {context_list}")
+    
     if not raw_text or len(raw_text) < 15:
         return raw_text
 
@@ -51,7 +55,7 @@ def llm_correction(raw_text: str, context_list: list):
         
         user_msg = f"CONTEXT:\n{context_str}\n\nNEW SENTENCE TO FIX:\n{raw_text}"
 
-        response = ollama.chat(
+        response = client.chat(
             model=LLM_MODEL_TYPE,
             messages=[
                 {'role': 'system', 'content': system_msg},
@@ -61,14 +65,16 @@ def llm_correction(raw_text: str, context_list: list):
         )
         return response['message']['content'].strip()
     except Exception as e:
-        print(f"Ollama Error: {e}")
-        return raw_text
-    
+        import traceback
+        print(f"Ollama Error1: {e}")
+        traceback.print_exc() # This will show the full error stack
+        return 'failed to correct'
 
 def generate_topic_title(sentences: list):
+    print(f"Generating title for topic with content: {' '.join(sentences)}")
     try:
         text_block = " ".join(sentences)
-        response = ollama.chat(
+        response = client.chat(
             model=LLM_MODEL_TYPE,
             messages=[{'role': 'user', 'content': f"Summarize this into a 3-7 word title: {text_block}"}]
         )
@@ -169,6 +175,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     sentence_buffer = []
     transcription_history = [] # Local to this connection
+    topic_buffer = []
     
     try:
         while True:
@@ -187,7 +194,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if len(full_audio) > 8000:
                     # Fire and forget the background task
                     asyncio.create_task(
-                        background_process(full_audio, transcription_history, websocket)
+                        background_process(full_audio, transcription_history, topic_buffer, websocket)
                     )
                 
     except WebSocketDisconnect:
