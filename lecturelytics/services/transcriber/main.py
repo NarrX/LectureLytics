@@ -7,8 +7,15 @@ from transformers import WhisperForConditionalGeneration, WhisperProcessor
 import ollama
 import os
 
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+# Initialize the model (it will download automatically on first run)
+embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+
 # Set your token
-os.environ["HF_TOKEN"] = "hf_VepKxofNESDKFbua   MylHuKmmbTTviDDdbu"
+os.environ["HF_TOKEN"] = "hf_VepKxofNESDKF  buaMylHuKmmbTTviDDdbu"
 
 app = FastAPI()
 
@@ -19,6 +26,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = WhisperForConditionalGeneration.from_pretrained(MODEL_ID).to(device)
 processor = WhisperProcessor.from_pretrained(MODEL_ID)
 
+
+WINDOW_GROUPING = 2
+COSINE_THRESHOLD = 0.55
 LLM_MODEL_TYPE = 'qwen2:1.5b'
 
 def llm_correction(raw_text: str, context_list: list):
@@ -53,6 +63,35 @@ def llm_correction(raw_text: str, context_list: list):
     except Exception as e:
         print(f"Ollama Error: {e}")
         return raw_text
+    
+
+def generate_topic_title(sentences: list):
+    try:
+        text_block = " ".join(sentences)
+        response = ollama.chat(
+            model=LLM_MODEL_TYPE,
+            messages=[{'role': 'user', 'content': f"Summarize this into a 3-7 word title: {text_block}"}]
+        )
+        return response['message']['content'].strip().replace('"', '')
+    except:
+        return "New Topic Segment"
+
+def detect_topic_shift(sentences, window_size=2, threshold=0.55):
+    if len(sentences) < (window_size * 2):
+        return False
+
+    window_a = sentences[-(window_size * 2) : -window_size]
+    window_b = sentences[-window_size:]
+
+    # Use embed_model (renamed)
+    vecs_a = embed_model.encode(window_a)
+    vecs_b = embed_model.encode(window_b)
+    
+    centroid_a = np.mean(vecs_a, axis=0).reshape(1, -1)
+    centroid_b = np.mean(vecs_b, axis=0).reshape(1, -1)
+
+    similarity = cosine_similarity(centroid_a, centroid_b)[0][0]
+    return similarity < threshold
 
 def transcribe_audio(audio_np: np.ndarray):
     """
@@ -80,35 +119,50 @@ def transcribe_audio(audio_np: np.ndarray):
         print(f"Whisper Error: {e}")
         return ""
 
-async def background_process(audio_data, history_ref, websocket: WebSocket):
-
-    # 1. Transcription (Whisper)
-
+async def background_process(audio_data, history_ref, topic_buffer, websocket: WebSocket):
+    # 1. Transcribe & Correct
     raw_text = await asyncio.to_thread(transcribe_audio, audio_data)
+    if not raw_text: return
     
-    if not raw_text:
-        return
-
-    # 2. Get Context (Last 3 refined sentences)
     context = [item["final"] for item in history_ref[-3:]]
-
-    # 3. Correction (Ollama)
     refined_text = await asyncio.to_thread(llm_correction, raw_text, context)
 
-    # 4. Update History
-    new_entry = {"raw": raw_text, "final": refined_text}
-    history_ref.append(new_entry)
-    
-    # Maintain max 5 for frontend
-    if len(history_ref) > 5:
-        history_ref.pop(0)
+    # 2. Update Rolling History (for correction context)
+    history_ref.append({"raw": raw_text, "final": refined_text})
+    if len(history_ref) > 5: history_ref.pop(0)
 
-    # 5. Push to Client
+    # 3. Add to Topic Buffer & Check for Shift
+    topic_buffer.append(refined_text)
+    
+    # 
+    shift_detected = await asyncio.to_thread(
+        detect_topic_shift, topic_buffer, WINDOW_GROUPING, COSINE_THRESHOLD
+    )
+
+    if shift_detected:
+        # Separate the sentences that belong to the OLD topic and the NEW one
+        old_topic_content = topic_buffer[:-WINDOW_GROUPING]
+        new_topic_start = topic_buffer[-WINDOW_GROUPING:]
+
+        # Generate Title for the topic that just finished
+        title = await asyncio.to_thread(generate_topic_title, old_topic_content)
+        
+        await websocket.send_json({
+            "type": "TOPIC_CARD_COMPLETE",
+            "title": title,
+            "content": old_topic_content
+        })
+
+        # Reset buffer with the sentences that triggered the new topic
+        topic_buffer[:] = new_topic_start 
+
+    # 4. Push Live Transcript Update
     await websocket.send_json({
-        "history": history_ref,
-        "count": len(history_ref)
+        "type": "TRANSCRIPT_UPDATE",
+        "latest": refined_text,
+        "full_history": history_ref
     })
-    print(f"Pushing refined: {refined_text}")
+
 
 @app.websocket("/ws/transcribe")
 async def websocket_endpoint(websocket: WebSocket):

@@ -1,5 +1,9 @@
-fastapi
-uvicorn
 torch
-torchaudio
 numpy
+uvicorn
+fastapi
+transformers
+accelerate
+ollama
+sentence-transformers
+scikit-learn
