@@ -12,7 +12,8 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-import os
+
+
 os.environ["OLLAMA_HOST"] = "127.0.0.1:11434"
 client = Client(host='http://127.0.0.1:11434')
 
