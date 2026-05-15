@@ -6,112 +6,129 @@ import Pusher from 'pusher-js';
 export default function GuestPage() {
   const [roomCode, setRoomCode] = useState<string>('');
   const [isConnected, setIsConnected] = useState(false);
-  const [topicSummaries, setTopicSummaries] = useState<any[]>([]);
-  const [pingMessages, setPingMessages] = useState<string[]>([]);
+  const [transcript, setTranscript] = useState<string[]>([]);
+  const [topicCards, setTopicCards] = useState<any[]>([]);
 
   const pusherRef = useRef<Pusher | null>(null);
 
   const handleJoinRoom = () => {
     if (roomCode.length !== 4) {
-      alert("Please enter a valid 4-digit code.");
+      alert("Please enter the 4-digit code provided by the host.");
       return;
     }
-
-    setTopicSummaries([]);
-    setPingMessages([]);
+    // Clear old data and switch view
+    setTranscript([]);
+    setTopicCards([]);
     setIsConnected(true);
   };
-  
+
   useEffect(() => {
+    if (!isConnected || !roomCode) return;
+
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
 
-
-
     if (!key || !cluster) {
-      setPingMessages([
-        'Missing Pusher configuration. Set NEXT_PUBLIC_PUSHER_KEY and NEXT_PUBLIC_PUSHER_CLUSTER in Vercel.',
-      ]);
+      console.error("Pusher environment variables are missing!");
       return;
     }
 
-    const pusher = new Pusher(key, {
-      cluster,
-      forceTLS: true,
-    });
+    // 1. Initialize Pusher
+    const pusher = new Pusher(key, { cluster, forceTLS: true });
     pusherRef.current = pusher;
 
-    const channel = pusher.subscribe('lecture-channel');
-    const channelName = `lecture-room-${roomCode}`;
+    // 2. Subscribe to the specific room channel
+    // Matches Host: channel: `room-${code}`
+    const channelName = `room-${roomCode}`;
+    const channel = pusher.subscribe(channelName);
 
-    channel.bind('new-topic-card', (data: any) => {
-      setTopicSummaries((prev) => [data, ...prev]);
+    console.log(`Subscribed to ${channelName}`);
+
+    // 3. Listen for Live Transcripts
+    channel.bind('transcript-update', (data: any) => {
+      if (data.transcript) {
+        setTranscript(data.transcript);
+      }
     });
 
-    channel.bind('ping-event', (data: any) => {
-      const message = typeof data === 'object' && data?.message ? data.message : 'Ping received from Pusher';
-      setPingMessages((prev) => [message, ...prev].slice(0, 10));
+    // 4. Listen for Finalized Topic Cards
+    channel.bind('topic-complete', (data: any) => {
+      setTopicCards((prev) => [data, ...prev]);
     });
 
     return () => {
       channel.unbind_all();
-      pusher.unsubscribe('lecture-channel');
+      pusher.unsubscribe(channelName);
       pusher.disconnect();
     };
-  }, []);
+  }, [isConnected, roomCode]);
 
   return (
-    <div className="p-10 bg-gray-100 min-h-screen">
-      <h2 className="text-2xl font-bold mb-4 text-blue-800">LectureLytics Guest</h2>
+    <main className="min-h-screen bg-slate-50 p-8 flex flex-col items-center">
+      <div className="max-w-4xl w-full space-y-8">
+        <h2 className="text-3xl font-black text-slate-900 text-center">LectureLytics <span className="text-indigo-600">Guest</span></h2>
 
-      {/* --- ROOM INPUT SECTION --- */}
-      {!isConnected ? (
-        <div className="bg-white p-6 rounded-lg shadow-md max-w-sm mx-auto text-center">
-          <h3 className="text-gray-700 font-semibold mb-4">Enter Lecture Code</h3>
-          <input
-            type="text"
-            maxLength={4}
-            placeholder="e.g. 1234"
-            value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value.replace(/\D/g, ''))}
-            className="w-full p-3 border-2 border-blue-100 rounded-md text-center text-2xl tracking-widest focus:border-blue-500 outline-none mb-4"
-          />
-          <button
-            onClick={handleJoinRoom}
-            className="w-full bg-blue-600 text-white font-bold py-3 rounded-md hover:bg-blue-700 transition"
-          >
-            Join Session
-          </button>
-        </div>
-      ) : (
-        /* --- ACTIVE SESSION VIEW --- */
-        <div>
-          <div className="flex justify-between items-center mb-6">
-            <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
-              Connected to Room: <strong>{roomCode}</strong>
-            </span>
-            <button 
-              onClick={() => setIsConnected(false)} 
-              className="text-sm text-gray-500 underline"
+        {!isConnected ? (
+          /* --- JOIN SCREEN --- */
+          <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center max-w-md mx-auto space-y-6">
+            <p className="text-slate-500">Enter the 4-digit code from the lecturer's screen.</p>
+            <input
+              type="text"
+              maxLength={4}
+              placeholder="0000"
+              value={roomCode}
+              onChange={(e) => setRoomCode(e.target.value.replace(/\D/g, ''))}
+              className="w-full p-4 border-2 border-slate-100 rounded-xl text-center text-3xl font-mono font-bold focus:border-indigo-500 outline-none"
+            />
+            <button
+              onClick={handleJoinRoom}
+              className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition shadow-lg"
             >
-              Leave Room
+              Join Lecture
             </button>
           </div>
+        ) : (
+          /* --- LIVE CONTENT VIEW --- */
+          <div className="space-y-6">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
+              <span className="flex items-center gap-2 text-slate-600 font-medium">
+                <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                Live in Room: <strong>{roomCode}</strong>
+              </span>
+              <button onClick={() => setIsConnected(false)} className="text-xs text-slate-400 hover:text-red-500 underline">
+                Leave
+              </button>
+            </div>
 
-          <div className="grid gap-4">
-            {topicSummaries.length === 0 ? (
-              <p className="italic text-gray-500">Waiting for {roomCode}'s host to send cards...</p>
-            ) : (
-              topicSummaries.map((topic, i) => (
-                <div key={i} className="bg-white p-4 rounded shadow-sm border-l-4 border-blue-500">
-                  <h3 className="font-bold text-lg text-gray-900">{topic.title}</h3>
-                  <p className="text-gray-600 mt-1">{topic.content}</p>
-                </div>
-              ))
-            )}
+            {/* Live Transcript View (Synced with Host) */}
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 min-h-[200px]">
+               <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Live Transcription</h3>
+               <div className="space-y-4">
+                 {transcript.length === 0 && <p className="text-slate-400 italic">Waiting for host to start speaking...</p>}
+                 {transcript.map((line, i) => (
+                   <p key={i} className="text-lg text-slate-800 border-l-2 border-indigo-100 pl-4">{line}</p>
+                 ))}
+               </div>
+            </div>
+
+            {/* Topic Cards View */}
+            <div className="grid gap-4">
+               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Key Topics</h3>
+               {topicCards.length === 0 && <p className="text-center py-10 text-slate-400 text-sm italic">Summary cards will appear as the lecture progresses.</p>}
+               {topicCards.map((card, idx) => (
+                 <div key={idx} className="bg-white p-6 rounded-xl border border-slate-100 shadow-md">
+                   <h4 className="text-xl font-bold text-slate-800 mb-2">{card.title}</h4>
+                   <div className="flex flex-wrap gap-2">
+                     {card.content.map((point: string, i: number) => (
+                       <span key={i} className="bg-indigo-50 text-indigo-700 text-xs px-3 py-1 rounded-full border border-indigo-100">{point}</span>
+                     ))}
+                   </div>
+                 </div>
+               ))}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </main>
   );
 }
