@@ -38,4 +38,11 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# log files
+*.log
+
+# Ignore downloaded ML models and caches
+**/models/
+**/CACHEDIR.TAG
 next-env.d.ts

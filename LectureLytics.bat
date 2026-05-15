@@ -1,17 +1,12 @@
 @echo off
-title LectureLytics launcher
+title LectureLytics Launcher
 cd /d "%~dp0"
 
-:: 1. Start the Python Backend in a separate window
-echo Starting Python Transcription Backend...
-start "Python Backend" cmd /k "cd lecturelytics\services\transcriber && python main.py"
-
-:: 2. Open the browser
+start "Python Backend" cmd /k "cd lecturelytics\services\transcriber && py -3.12-64 -u main.py"
+timeout /t 5 /nobreak
+cd lecturelytics
+start "Next.js" cmd /k "npm run dev"
+timeout /t 10 /nobreak
 start http://localhost:3000
 
-:: 3. Run the React Dev Server in the current window
-echo Starting React Development Server...
-cd lecturelytics
-call npm run dev
-
-cmd /k
+cmd

@@ -1,8 +1,11 @@
 fastapi
-uvicorn
-numpy
-torch
-transformers
-accelerate
+uvicorn[standard]
+faster_whisper
+llama-cpp-python
 sentence-transformers
 scikit-learn
+numpy
+torch
+silero-vad
+pusher
+python-multipart
