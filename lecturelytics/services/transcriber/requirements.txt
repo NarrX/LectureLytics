@@ -1,9 +1,8 @@
-torch
-numpy
-uvicorn
 fastapi
+uvicorn
+numpy
+torch
 transformers
 accelerate
-ollama
 sentence-transformers
 scikit-learn
