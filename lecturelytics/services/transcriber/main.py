@@ -15,25 +15,51 @@ ken = "hodgOYFsUvEZzuIHCWSI"
 os.environ["HF_TOKEN"] = f"{tok}{ken}"
 print("Hugging Face Token Loaded Successfully")
 
+# --- CONFIGURE LOCAL STORAGE FOR MODELS ---
+# This forces Hugging Face and Sentence-Transformers to download and read from your local directory
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+LOCAL_MODEL_DIR = os.path.join(PROJECT_ROOT, "models")
+os.makedirs(LOCAL_MODEL_DIR, exist_ok=True)
+
+# Set environment variables so underlying libraries use our folder
+os.environ["HF_HOME"] = os.path.join(LOCAL_MODEL_DIR, "hf_cache")
+os.environ["SENTENCE_TRANSCRIPTORS_HOME"] = os.path.join(LOCAL_MODEL_DIR, "st_cache")
+
 app = FastAPI()
 
 # System Device Configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# 1. Load Whisper Model
+# 1. Load Whisper Model (Stored Locally)
 WHISPER_MODEL_ID = "openai/whisper-base" 
-whisper_model = WhisperForConditionalGeneration.from_pretrained(WHISPER_MODEL_ID).to(device)
-processor = WhisperProcessor.from_pretrained(WHISPER_MODEL_ID)
+whisper_cache_dir = os.path.join(LOCAL_MODEL_DIR, "whisper-base")
 
-# 2. Load In-Python LLM (Replacing Ollama)
+print(f"Loading Whisper Model (Source/Cache: {whisper_cache_dir})...")
+whisper_model = WhisperForConditionalGeneration.from_pretrained(
+    WHISPER_MODEL_ID, 
+    cache_dir=whisper_cache_dir
+).to(device)
+
+processor = WhisperProcessor.from_pretrained(
+    WHISPER_MODEL_ID, 
+    cache_dir=whisper_cache_dir
+)
+
+# 2. Load In-Python LLM (Stored Locally)
 LLM_MODEL_ID = "Qwen/Qwen2-1.5B-Instruct"
-print(f"Loading local LLM: {LLM_MODEL_ID}...")
-llm_tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_ID)
+llm_cache_dir = os.path.join(LOCAL_MODEL_DIR, "qwen-1.5b")
+
+print(f"Loading local LLM (Source/Cache: {llm_cache_dir})...")
+llm_tokenizer = AutoTokenizer.from_pretrained(
+    LLM_MODEL_ID, 
+    cache_dir=llm_cache_dir
+)
 llm_model = AutoModelForCausalLM.from_pretrained(
     LLM_MODEL_ID,
     torch_dtype="auto",
-    device_map="auto"  # Automatically splits between GPU and CPU based on capability
+    device_map="auto",  # Automatically splits between GPU and CPU based on capability
+    cache_dir=llm_cache_dir
 )
 
 # Initialize text-generation pipeline
@@ -43,8 +69,10 @@ llm_pipeline = pipeline(
     tokenizer=llm_tokenizer,
 )
 
-# 3. Load Embedding Model
-embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+# 3. Load Embedding Model (Stored Locally)
+st_cache_dir = os.path.join(LOCAL_MODEL_DIR, "sentence-transformers")
+print(f"Loading Embedding Model (Source/Cache: {st_cache_dir})...")
+embed_model = SentenceTransformer('all-MiniLM-L6-v2', cache_folder=st_cache_dir)
 
 WINDOW_GROUPING = 2
 COSINE_THRESHOLD = 0.55
@@ -58,7 +86,6 @@ def llm_correction(raw_text: str, context_list: list):
     context_str = "\n".join(context_list)
 
     try:
-        # Use Qwen's specific chat template structure
         messages = [
             {
                 "role": "system", 
@@ -75,17 +102,15 @@ def llm_correction(raw_text: str, context_list: list):
             }
         ]
         
-        # Turn template into a single prompt string
         prompt = llm_tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         
         outputs = llm_pipeline(
             prompt,
             max_new_tokens=150,
-            do_sample=False,  # Equivalent to low temperature/deterministic mode
+            do_sample=False,  
             pad_token_id=llm_tokenizer.eos_token_id
         )
         
-        # Parse output to isolate the assistant's generation
         generated_text = outputs[0]['generated_text']
         corrected_text = generated_text.split("<|im_start|>assistant\n")[-1].replace("<|im_end|>", "").strip()
         return corrected_text
