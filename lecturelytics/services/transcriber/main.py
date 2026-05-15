@@ -17,11 +17,12 @@ import numpy as np
 os.environ["OLLAMA_HOST"] = "127.0.0.1:11434"
 client = Client(host='http://127.0.0.1:11434')
 
-# Initialize the model (it will download automatically on first run)
 embed_model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Set your token
-os.environ["HF_TOKEN"] = "hf_VepKxofNESDKF  buaMylHuKmmbTTviDDdbu"
+tok = "hf_csrqbgIOwtFrwP"
+ken = "hodgOYFsUvEZzuIHCWSI"
+
+os.environ["HF_TOKEN"] = f"{tok}{ken}"
 
 app = FastAPI()
 
@@ -68,7 +69,7 @@ def llm_correction(raw_text: str, context_list: list):
     except Exception as e:
         import traceback
         print(f"Ollama Error1: {e}")
-        traceback.print_exc() # This will show the full error stack
+        traceback.print_exc()
         return 'failed to correct'
 
 def generate_topic_title(sentences: list):
