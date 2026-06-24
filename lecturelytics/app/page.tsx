@@ -29,7 +29,7 @@ export default function TranscribePage() {
     }
 
     setSessionState("connecting");
-    setSessionMessage("Connecting to backend...");
+    setSessionMessage("Connecting to backend");
 
     try {
       // Connect to local backend
@@ -66,12 +66,12 @@ export default function TranscribePage() {
 
       socketRef.current.onerror = () => {
         setSessionState("error");
-        setSessionMessage("Could not connect. Is main.py running?");
+        setSessionMessage("Could not connect. make sure main.py is running.");
       };
 
     } catch (err) {
       setSessionState("error");
-      setSessionMessage("Could not reach backend. Is main.py running?");
+      setSessionMessage("Could not reach backend. Make sure main.py is running.");
     }
   };
 
@@ -128,7 +128,7 @@ export default function TranscribePage() {
     <main className="min-h-screen bg-slate-50 p-8 flex flex-col items-center">
       <div className="max-w-4xl w-full space-y-10">
         {!isCodeFinalized ? (
-          /* --- SETUP SCREEN --- */
+          /*START SCREEN*/
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center max-w-md mx-auto space-y-6">
             <h2 className="text-2xl font-bold text-slate-800">
               LectureLytics <span className="text-indigo-600">Host</span>
@@ -193,7 +193,7 @@ export default function TranscribePage() {
                     : "bg-indigo-600 hover:bg-indigo-700 text-white"
                 }`}
               >
-                {isRecording ? "⏹ Stop" : "⏺ Record"}
+                {isRecording ? "Stop" : "Record"}
               </button>
             </div>
 
@@ -219,7 +219,7 @@ export default function TranscribePage() {
               </div>
             </div>
 
-            {/* Topic Cards */}
+            {/*Topic cards*/}
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                 Topic Cards
