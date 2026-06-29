@@ -76,7 +76,7 @@ export default function TranscribePage() {
 
       socketRef.current.onerror = () => {
         setSessionState("error");
-        setSessionMessage("Could not connect. Is main.py running?");
+        setSessionMessage("Could not connect. Make sure main.py is running.");
       };
 
 
@@ -84,7 +84,7 @@ export default function TranscribePage() {
       const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
 
       if (!key || !cluster) {
-        console.error("Pusher environment variables are missing!");
+        console.error("Pusher environment variables are missing");
         return;
       }
 
@@ -204,22 +204,22 @@ export default function TranscribePage() {
     setIsRecording(false);
   };
 
-  // --- STATUS BADGE ---
+  // STATUS BADGE
   const statusBadge = {
     idle: null,
     connecting: (
       <span className="text-xs text-amber-600 font-medium animate-pulse">
-        ⏳ {sessionMessage}
+        {sessionMessage}
       </span>
     ),
     ready: (
       <span className="text-xs text-green-600 font-medium">
-        ✓ {sessionMessage}
+        {sessionMessage}
       </span>
     ),
     error: (
       <span className="text-xs text-red-500 font-medium">
-        ✗ {sessionMessage}
+        {sessionMessage}
       </span>
     ),
   };
