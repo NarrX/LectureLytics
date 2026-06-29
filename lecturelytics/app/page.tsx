@@ -39,10 +39,14 @@ export default function GuestPage() {
       return;
     }
 
-    const pusher = new Pusher(key, { cluster, forceTLS: true });
-    pusherRef.current = pusher;
+    const pusher = new Pusher(key, { 
+        cluster, 
+        forceTLS: true,
+        authEndpoint: '/api/pusher-auth' 
+      });
+      pusherRef.current = pusher;
 
-    const channelName = `room-${roomCode}`;
+    const channelName = `presence-room-${roomCode}`;
     const channel = pusher.subscribe(channelName);
 
     console.log(`Subscribed to ${channelName}`);
@@ -55,6 +59,20 @@ export default function GuestPage() {
 
     channel.bind('topic-complete', (data: TopicCard) => {
       setTopicCards((prev) => [data, ...prev]);
+    });
+
+    channel.bind('question-submitted', (data: { topicIndex: number; question: string }) => {
+      setTopicCards((prev) => {
+        const updated = [...prev];
+        const targetIndex = updated.length - 1 - data.topicIndex; 
+        if (updated[targetIndex]) {
+          updated[targetIndex].questions = [
+            ...(updated[targetIndex].questions || []),
+            data.question
+          ];
+        }
+        return updated;
+      });
     });
 
     return () => {
