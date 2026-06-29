@@ -72,7 +72,7 @@ export default function GuestPage() {
         </h2>
 
         {!isConnected ? (
-          /* --- JOIN SCREEN --- */
+          /*Join screen */
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center max-w-md mx-auto space-y-6">
             <p className="text-slate-500">Enter the 4-digit code from the lecturer's screen.</p>
             <input
@@ -91,7 +91,7 @@ export default function GuestPage() {
             </button>
           </div>
         ) : (
-          /* --- LIVE CONTENT VIEW --- */
+          /*live content views*/
           <div className="space-y-6">
             <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
               <span className="flex items-center gap-2 text-slate-600 font-medium">
@@ -103,7 +103,7 @@ export default function GuestPage() {
               </button>
             </div>
 
-            {/* Live Transcript View (Synced with Host) */}
+            {/*Live Transcript view*/}
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 h-[260px]">
               <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Live Transcription</h3>
               <div className="space-y-4">
@@ -114,7 +114,7 @@ export default function GuestPage() {
               </div>
             </div>
 
-            {/* Topic Cards View */}
+            {/* Topic cards view */}
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Key Topics</h3>
               {topicCards.length === 0 && (
@@ -129,7 +129,7 @@ export default function GuestPage() {
                     key={idx}
                     className="bg-cyan-400 rounded-3xl border-2 border-slate-900 p-5 flex gap-5 shadow-md"
                   >
-                    {/* Left column: title + confidence */}
+                    {/*Left column: title + confidence*/}
                     <div className="flex flex-col justify-between w-48 shrink-0">
                       <h4 className="text-2xl font-serif text-white leading-tight">
                         {card.title}

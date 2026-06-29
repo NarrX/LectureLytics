@@ -20,9 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing socket_id or channel_name' }, { status: 400 });
     }
 
-    // Generate a random anonymous identity for this guest connection.
-    // Presence channels need a user_id but we don't have real auth —
-    // a random id per browser session is enough to track connection count.
+    // Generate a random anonymous identity for one (this instance) guest connection
     const userId = `guest_${Math.random().toString(36).slice(2, 10)}`;
 
     const authResponse = pusher.authorizeChannel(socketId, channel, {
