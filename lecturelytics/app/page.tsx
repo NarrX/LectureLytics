@@ -3,11 +3,18 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Pusher from 'pusher-js';
 
+interface TopicCard {
+  title: string;
+  content: string[];
+  questions?: string[];
+  confidence?: number;
+}
+
 export default function GuestPage() {
   const [roomCode, setRoomCode] = useState<string>('');
   const [isConnected, setIsConnected] = useState(false);
   const [transcript, setTranscript] = useState<string[]>([]);
-  const [topicCards, setTopicCards] = useState<any[]>([]);
+  const [topicCards, setTopicCards] = useState<TopicCard[]>([]);
 
   const pusherRef = useRef<Pusher | null>(null);
 
@@ -16,7 +23,6 @@ export default function GuestPage() {
       alert("Please enter the 4-digit code provided by the host.");
       return;
     }
-    // Clear old data and switch view
     setTranscript([]);
     setTopicCards([]);
     setIsConnected(true);
@@ -33,26 +39,21 @@ export default function GuestPage() {
       return;
     }
 
-    // 1. Initialize Pusher
     const pusher = new Pusher(key, { cluster, forceTLS: true });
     pusherRef.current = pusher;
 
-    // 2. Subscribe to the specific room channel
-    // Matches Host: channel: `room-${code}`
     const channelName = `room-${roomCode}`;
     const channel = pusher.subscribe(channelName);
 
     console.log(`Subscribed to ${channelName}`);
 
-    // 3. Listen for Live Transcripts
     channel.bind('transcript-update', (data: any) => {
       if (data.transcript) {
         setTranscript(data.transcript);
       }
     });
 
-    // 4. Listen for Finalized Topic Cards
-    channel.bind('topic-complete', (data: any) => {
+    channel.bind('topic-complete', (data: TopicCard) => {
       setTopicCards((prev) => [data, ...prev]);
     });
 
@@ -66,10 +67,12 @@ export default function GuestPage() {
   return (
     <main className="min-h-screen bg-slate-50 p-8 flex flex-col items-center">
       <div className="max-w-4xl w-full space-y-8">
-        <h2 className="text-3xl font-black text-slate-900 text-center">LectureLytics <span className="text-indigo-600">Guest</span></h2>
+        <h2 className="text-3xl font-black text-slate-900 text-center">
+          LectureLytics <span className="text-indigo-600">Guest</span>
+        </h2>
 
         {!isConnected ? (
-          /* --- JOIN SCREEN --- */
+          /*Join screen */
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center max-w-md mx-auto space-y-6">
             <p className="text-slate-500">Enter the 4-digit code from the lecturer's screen.</p>
             <input
@@ -88,7 +91,7 @@ export default function GuestPage() {
             </button>
           </div>
         ) : (
-          /* --- LIVE CONTENT VIEW --- */
+          /*live content views*/
           <div className="space-y-6">
             <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
               <span className="flex items-center gap-2 text-slate-600 font-medium">
@@ -100,31 +103,63 @@ export default function GuestPage() {
               </button>
             </div>
 
-            {/* Live Transcript View (Synced with Host) */}
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 min-h-[200px]">
-               <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Live Transcription</h3>
-               <div className="space-y-4">
-                 {transcript.length === 0 && <p className="text-slate-400 italic">Waiting for host to start speaking...</p>}
-                 {transcript.map((line, i) => (
-                   <p key={i} className="text-lg text-slate-800 border-l-2 border-indigo-100 pl-4">{line}</p>
-                 ))}
-               </div>
+            {/*Live Transcript view*/}
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 h-[260px]">
+              <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Live Transcription</h3>
+              <div className="space-y-4">
+                {transcript.length === 0 && <p className="text-slate-400 italic">Waiting for host to start speaking...</p>}
+                {transcript.slice(-5).map((line, i) => (
+                  <p key={i} className="text-lg text-slate-800 border-l-2 border-indigo-100 pl-4">{line}</p>
+                ))}
+              </div>
             </div>
 
-            {/* Topic Cards View */}
-            <div className="grid gap-4">
-               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Key Topics</h3>
-               {topicCards.length === 0 && <p className="text-center py-10 text-slate-400 text-sm italic">Summary cards will appear as the lecture progresses.</p>}
-               {topicCards.map((card, idx) => (
-                 <div key={idx} className="bg-white p-6 rounded-xl border border-slate-100 shadow-md">
-                   <h4 className="text-xl font-bold text-slate-800 mb-2">{card.title}</h4>
-                   <div className="flex flex-wrap gap-2">
-                     {card.content.map((point: string, i: number) => (
-                       <span key={i} className="bg-indigo-50 text-indigo-700 text-xs px-3 py-1 rounded-full border border-indigo-100">{point}</span>
-                     ))}
-                   </div>
-                 </div>
-               ))}
+            {/* Topic cards view */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Key Topics</h3>
+              {topicCards.length === 0 && (
+                <p className="text-center py-10 text-slate-400 text-sm italic">
+                  Summary cards will appear as the lecture progresses.
+                </p>
+              )}
+
+              <div className="space-y-4">
+                {topicCards.map((card, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-cyan-400 rounded-3xl border-2 border-slate-900 p-5 flex gap-5 shadow-md"
+                  >
+                    {/*Left column: title + confidence*/}
+                    <div className="flex flex-col justify-between w-48 shrink-0">
+                      <h4 className="text-2xl font-serif text-white leading-tight">
+                        {card.title}
+                      </h4>
+                      <div className="bg-white border-2 border-slate-900 rounded-xl px-4 py-2 self-start mt-4">
+                        <span className="text-lg font-bold text-slate-800">
+                          {card.confidence ?? 95}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right column: questions panel */}
+                    <div className="flex-1 bg-cyan-50 border-2 border-slate-900 rounded-2xl p-3 space-y-2 min-h-[120px]">
+                      {(!card.questions || card.questions.length === 0) && (
+                        <p className="text-cyan-700/60 text-sm italic px-2 py-2">
+                          No questions yet for this topic.
+                        </p>
+                      )}
+                      {card.questions?.map((q, qi) => (
+                        <div
+                          key={qi}
+                          className="bg-white border border-slate-700 rounded-full px-4 py-2 text-sm text-slate-700"
+                        >
+                          {q}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
