@@ -16,6 +16,10 @@ export default function GuestPage() {
   const [transcript, setTranscript] = useState<string[]>([]);
   const [topicCards, setTopicCards] = useState<TopicCard[]>([]);
 
+  const [guestId] = useState(() => `guest_${Math.random().toString(36).slice(2, 11)}`);
+  const [toggledIndices, setToggledIndices] = useState<Record<number, boolean>>({});
+  const [questionInputs, setQuestionInputs] = useState<Record<number, string>>({});
+
   const pusherRef = useRef<Pusher | null>(null);
 
   const handleJoinRoom = () => {
@@ -40,11 +44,11 @@ export default function GuestPage() {
     }
 
     const pusher = new Pusher(key, { 
-        cluster, 
-        forceTLS: true,
-        authEndpoint: '/api/pusher-auth' 
-      });
-      pusherRef.current = pusher;
+      cluster, 
+      forceTLS: true,
+      authEndpoint: '/api/pusher-auth' 
+    });
+    pusherRef.current = pusher;
 
     const channelName = `presence-room-${roomCode}`;
     const channel = pusher.subscribe(channelName);
@@ -82,6 +86,38 @@ export default function GuestPage() {
     };
   }, [isConnected, roomCode]);
 
+  const submitQuestion = async (originalIdx: number) => {
+    const text = questionInputs[originalIdx]?.trim();
+    if (!text) return;
+
+    try {
+      const res = await fetch('/api/pusher-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: roomCode, topicIndex: originalIdx, question: text })
+      });
+
+      if (res.ok) setQuestionInputs(prev => ({ ...prev, [originalIdx]: '' }));
+    } catch (err) {
+      console.error("Failed to send question:", err);
+    }
+  };
+
+  const handleToggleUnderstand = async (originalIdx: number) => {
+    const nextState = !toggledIndices[originalIdx];
+    setToggledIndices(prev => ({ ...prev, [originalIdx]: nextState }));
+
+    try {
+      await fetch('/api/pusher-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: roomCode, topicIndex: originalIdx, guestId, toggledOn: nextState })
+      });
+    } catch (err) {
+      console.error("Failed to send toggle status:", err);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 p-8 flex flex-col items-center">
       <div className="max-w-4xl w-full space-y-8">
@@ -90,7 +126,6 @@ export default function GuestPage() {
         </h2>
 
         {!isConnected ? (
-          /*Join screen */
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center max-w-md mx-auto space-y-6">
             <p className="text-slate-500">Enter the 4-digit code from the lecturer's screen.</p>
             <input
@@ -109,7 +144,6 @@ export default function GuestPage() {
             </button>
           </div>
         ) : (
-          /*live content views*/
           <div className="space-y-6">
             <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
               <span className="flex items-center gap-2 text-slate-600 font-medium">
@@ -121,7 +155,6 @@ export default function GuestPage() {
               </button>
             </div>
 
-            {/*Live Transcript view*/}
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 h-[260px]">
               <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Live Transcription</h3>
               <div className="space-y-4">
@@ -132,7 +165,6 @@ export default function GuestPage() {
               </div>
             </div>
 
-            {/* Topic cards view */}
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Key Topics</h3>
               {topicCards.length === 0 && (
@@ -142,41 +174,74 @@ export default function GuestPage() {
               )}
 
               <div className="space-y-4">
-                {topicCards.map((card, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-cyan-400 rounded-3xl border-2 border-slate-900 p-5 flex gap-5 shadow-md"
-                  >
-                    {/*Left column: title + confidence*/}
-                    <div className="flex flex-col justify-between w-48 shrink-0">
-                      <h4 className="text-2xl font-serif text-white leading-tight">
-                        {card.title}
-                      </h4>
-                      <div className="bg-white border-2 border-slate-900 rounded-xl px-4 py-2 self-start mt-4">
-                        <span className="text-lg font-bold text-slate-800">
-                          {card.confidence ?? 95}%
-                        </span>
+                {topicCards.map((card, idx) => {
+                  const originalIdx = topicCards.length - 1 - idx;
+                  const isToggled = !!toggledIndices[originalIdx];
+
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-cyan-400 rounded-3xl border-2 border-slate-900 p-5 flex flex-col md:flex-row gap-5 shadow-md"
+                    >
+                      <div className="flex flex-col justify-between w-48 shrink-0">
+                        <h4 className="text-2xl font-serif text-white leading-tight">
+                          {card.title}
+                        </h4>
+                        
+                        <div className="mt-4 flex flex-col gap-1">
+                          <span className="text-xs font-bold text-cyan-900 uppercase tracking-wider">I Understand:</span>
+                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                            <input 
+                              type="checkbox" 
+                              checked={isToggled}
+                              onChange={() => handleToggleUnderstand(originalIdx)}
+                              className="sr-only peer" 
+                            />
+                            <div className="w-14 h-7 bg-slate-700/40 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[4px] after:start-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-6 after:transition-all peer-checked:bg-slate-900"></div>
+                            <span className="ms-2 text-sm font-bold text-slate-900">
+                              {isToggled ? "Yes" : "No"}
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 flex flex-col justify-between bg-cyan-50 border-2 border-slate-900 rounded-2xl p-4 space-y-4 min-h-[160px]">
+                        <div className="space-y-2 max-h-[120px] overflow-y-auto">
+                          {(!card.questions || card.questions.length === 0) && (
+                            <p className="text-cyan-700/60 text-sm italic">
+                              No questions yet for this topic.
+                            </p>
+                          )}
+                          {card.questions?.map((q, qi) => (
+                            <div
+                              key={qi}
+                              className="bg-white border border-slate-700 rounded-full px-4 py-1.5 text-sm text-slate-700 shadow-sm"
+                            >
+                              {q}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex gap-2 pt-2 border-t border-cyan-200">
+                          <input
+                            type="text"
+                            placeholder="Ask a question..."
+                            value={questionInputs[originalIdx] || ''}
+                            onChange={(e) => setQuestionInputs(prev => ({ ...prev, [originalIdx]: e.target.value }))}
+                            onKeyDown={(e) => e.key === 'Enter' && submitQuestion(originalIdx)}
+                            className="flex-1 px-4 py-2 text-sm bg-white border border-slate-400 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-800 placeholder-slate-400"
+                          />
+                          <button
+                            onClick={() => submitQuestion(originalIdx)}
+                            className="bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-slate-800 transition"
+                          >
+                            Send
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Right column: questions panel */}
-                    <div className="flex-1 bg-cyan-50 border-2 border-slate-900 rounded-2xl p-3 space-y-2 min-h-[120px]">
-                      {(!card.questions || card.questions.length === 0) && (
-                        <p className="text-cyan-700/60 text-sm italic px-2 py-2">
-                          No questions yet for this topic.
-                        </p>
-                      )}
-                      {card.questions?.map((q, qi) => (
-                        <div
-                          key={qi}
-                          className="bg-white border border-slate-700 rounded-full px-4 py-2 text-sm text-slate-700"
-                        >
-                          {q}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
