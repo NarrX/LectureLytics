@@ -18,4 +18,4 @@ As Host:
 As Guest:
 - Go to https://lecture-lytics.vercel.app to enter the guest view.
 - Enter the room number the host gave you.
--Enjoy ig.
+- Enjoy ig.
