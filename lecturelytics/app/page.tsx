@@ -155,12 +155,12 @@ export default function GuestPage() {
               </button>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 h-[260px]">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 h-[260px] overflow-hidden">
               <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Live Transcription</h3>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {transcript.length === 0 && <p className="text-slate-400 italic">Waiting for host to start speaking...</p>}
                 {transcript.slice(-5).map((line, i) => (
-                  <p key={i} className="text-lg text-slate-800 border-l-2 border-indigo-100 pl-4">{line}</p>
+                  <p key={i} className="text-lg text-slate-800 border-l-2 border-indigo-100 pl-4 truncate">{line}</p>
                 ))}
               </div>
             </div>
@@ -181,10 +181,10 @@ export default function GuestPage() {
                   return (
                     <div
                       key={idx}
-                      className="bg-cyan-400 rounded-3xl border-2 border-slate-900 p-5 flex flex-col md:flex-row gap-5 shadow-md"
+                      className="bg-cyan-400 rounded-3xl border-2 border-slate-900 p-5 flex flex-col md:flex-row gap-5 shadow-md h-[260px]"
                     >
-                      <div className="flex flex-col justify-between w-48 shrink-0">
-                        <h4 className="text-2xl font-serif text-white leading-tight">
+                      <div className="flex flex-col justify-between w-48 shrink-0 overflow-hidden">
+                        <h4 className="text-2xl font-serif text-white leading-tight line-clamp-4">
                           {card.title}
                         </h4>
                         
@@ -205,8 +205,8 @@ export default function GuestPage() {
                         </div>
                       </div>
 
-                      <div className="flex-1 flex flex-col justify-between bg-cyan-50 border-2 border-slate-900 rounded-2xl p-4 space-y-4 min-h-[160px]">
-                        <div className="space-y-2 max-h-[120px] overflow-y-auto">
+                      <div className="flex-1 flex flex-col bg-cyan-50 border-2 border-slate-900 rounded-2xl p-4 gap-2 h-full min-h-0">
+                        <div className="flex-1 space-y-2 overflow-y-auto min-h-0">
                           {(!card.questions || card.questions.length === 0) && (
                             <p className="text-cyan-700/60 text-sm italic">
                               No questions yet for this topic.
@@ -222,7 +222,7 @@ export default function GuestPage() {
                           ))}
                         </div>
 
-                        <div className="flex gap-2 pt-2 border-t border-cyan-200">
+                        <div className="flex gap-2 pt-2 border-t border-cyan-200 shrink-0">
                           <input
                             type="text"
                             placeholder="Ask a question..."
