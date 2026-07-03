@@ -300,11 +300,11 @@ export default function TranscribePage() {
             </div>
 
             {/* Live Transcript */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 h-[260px]">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 h-[260px] overflow-hidden">
               <h3 className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">
                 Live Transcription
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {transcript.length === 0 && (
                   <p className="text-slate-400 italic">
                     Press Record and start speaking
@@ -313,7 +313,7 @@ export default function TranscribePage() {
                 {transcript.slice(-5).map((line, i) => (
                   <p
                     key={i}
-                    className="text-lg text-slate-800 border-l-2 border-indigo-200 pl-4"
+                    className="text-lg text-slate-800 border-l-2 border-indigo-200 pl-4 truncate"
                   >
                     {line}
                   </p>
@@ -344,11 +344,11 @@ export default function TranscribePage() {
                   return (
                     <div
                       key={idx}
-                      className="bg-cyan-400 rounded-3xl border-2 border-slate-900 p-5 flex gap-5 shadow-md"
+                      className="bg-cyan-400 rounded-3xl border-2 border-slate-900 p-5 flex gap-5 shadow-md h-[220px]"
                     >
                       {/* Left column: title + live percentage */}
-                      <div className="flex flex-col justify-between w-48 shrink-0">
-                        <h4 className="text-2xl font-serif text-white leading-tight">
+                      <div className="flex flex-col justify-between w-48 shrink-0 overflow-hidden">
+                        <h4 className="text-2xl font-serif text-white leading-tight line-clamp-4">
                           {card.title}
                         </h4>
                         <div className="bg-white border-2 border-slate-900 rounded-xl px-4 py-2 self-start mt-4">
@@ -359,7 +359,7 @@ export default function TranscribePage() {
                       </div>
 
                       {/* Right column: live questions panel */}
-                      <div className="flex-1 bg-cyan-50 border-2 border-slate-900 rounded-2xl p-3 space-y-2 min-h-[120px] max-h-[200px] overflow-y-auto">
+                      <div className="flex-1 bg-cyan-50 border-2 border-slate-900 rounded-2xl p-3 space-y-2 h-full overflow-y-auto">
                         {card.questions.length === 0 && (
                           <p className="text-cyan-700/60 text-sm italic px-2 py-2">
                             No questions yet for this topic.
