@@ -284,7 +284,7 @@ export default function TranscribePage() {
                   <span className="font-mono text-indigo-600">{roomCode}</span>
                 </h1>
                 <p className="text-xs text-slate-400 mt-1">
-                  {connectedGuests} guest{connectedGuests !== 1 ? "s" : ""} connected
+                  {connectedGuests-1} guest(s) connected
                 </p>
               </div>
               <button
@@ -337,7 +337,7 @@ export default function TranscribePage() {
                   const percentage =
                     connectedGuests > 0
                       ? Math.round(
-                          (card.toggledGuestIds.length / connectedGuests) * 100
+                          (Math.max(0, card.toggledGuestIds.length) /(connectedGuests-1)) * 100
                         )
                       : 0;
 
