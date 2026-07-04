@@ -62,13 +62,13 @@ export default function GuestPage() {
     });
 
     channel.bind('topic-complete', (data: TopicCard) => {
-      setTopicCards((prev) => [data, ...prev]);
+      setTopicCards((prev) => [...prev, data]);
     });
 
     channel.bind('question-submitted', (data: { topicIndex: number; question: string }) => {
       setTopicCards((prev) => {
         const updated = [...prev];
-        const targetIndex = updated.length - 1 - data.topicIndex; 
+        const targetIndex = data.topicIndex;
         if (updated[targetIndex]) {
           updated[targetIndex].questions = [
             ...(updated[targetIndex].questions || []),
@@ -175,7 +175,7 @@ export default function GuestPage() {
 
               <div className="space-y-4">
                 {topicCards.map((card, idx) => {
-                  const originalIdx = topicCards.length - 1 - idx;
+                  const originalIdx = idx;
                   const isToggled = !!toggledIndices[originalIdx];
 
                   return (
