@@ -11,9 +11,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 # Setup Hugging Face token
-tok = "hf_csrqbgIOwtFrwP"
-ken = "hodgOYFsUvEZzuIHCWSI"
-os.environ["HF_TOKEN"] = f"{tok}{ken}"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 print("Hugging Face Token Loaded Successfully")
 
@@ -38,16 +35,16 @@ app.add_middleware(
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {device}")
 
-# Load faster-whisper
+# Load whisper-base
 whisper_cache_dir = os.path.join(LOCAL_MODEL_DIR, "whisper-base")
-print(f"Loading faster-whisper (cache: {whisper_cache_dir})...")
+print(f"Loading whisper-base (cache: {whisper_cache_dir})...")
 whisper_model = WhisperModel(
     "base",
     device="cpu",
     compute_type="int8",
     download_root=whisper_cache_dir
 )
-print("faster-whisper loaded.")
+print("whisper-base loaded.")
 
 # Load Qwen2 via llama.cpp
 llm_cache_dir = os.path.join(LOCAL_MODEL_DIR, "qwen-1.5b-gguf")
