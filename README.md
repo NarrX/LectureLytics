@@ -24,13 +24,10 @@ App to help with lectures
 5. Topic Segmentation & Extraction: `SentenceTransformer` detects sub-topic boundaries via cosine similarity, and `llama-cpp-python` generates structured topic cards.
 6. Real-Time Broadcast: Pusher Channels broadcasts transcript and topic updates to connected Host and Guest clients.
 
-
-
 # Requirements
 - Python 3.12+ (and the respective libraries in requirements.txt)
 - Node.js 18+
 - C++ Compilation Toolchain (required for llama-cpp-python)
-
 
 # To start
 
