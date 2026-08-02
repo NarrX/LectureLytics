@@ -228,7 +228,7 @@ export default function TranscribePage() {
     <main className="min-h-screen bg-slate-50 p-8 flex flex-col items-center">
       <div className="max-w-4xl w-full space-y-10">
         {!isCodeFinalized ? (
-          /* --- SETUP SCREEN --- */
+          /* START/INITIALIZE SCREEN */
           <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center max-w-md mx-auto space-y-6">
             <h2 className="text-2xl font-bold text-slate-800">
               LectureLytics <span className="text-indigo-600">Host</span>
